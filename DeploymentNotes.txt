@@ -1,0 +1,124 @@
+AWS DEPLOYMENT STEPS:
+
+(djangoPy3Env) project_name> pip freeze > requirements.txt
+
+(djangoPy3Env) project_name> touch .gitignore (files below)
+------------------------------------------------------------------
+__pycache__/
+.vscode/
+venv/
+db.sqlite3
+-------------------------------------------------------------------
+CREATING A GIT DIRECTORY TO BE DEPLOYED
+-------------------------------------------------------------------
+(djangoPy3Env) project_name> git init
+
+(djangoPy3Env) project_name> git add --all
+
+(djangoPy3Env) project_name> git commit -m "initial commit"
+
+(djangoPy3Env) project_name> git remote add origin https://github.com/your_github_username/your_github_repo_name
+
+(djangoPy3Env) project_name> git push origin master
+---------------------------------------------------------------------
+LAUNCH AN INSTANCE ON AWS
+----------------------------------------------------------------------
+SELECT SERVER SSD VOLUME TYPE
+SELECT T2.MICRO
+EDIT SECURITIES SHH-MYIP HTTP/HTTPS-ANYWHERE
+CREATE A KEY PAIR FILE(PEM) AND SAVE IT IN A SAFE LOCATION!
+----------------------------------------------------------------------
+CONNECTING VIA BASH
+----------------------------------------------------------------------
+FROM INSTANCE COMMAND WINDOW
+
+the_folder_containing_your_pem_file> chmod 400 your_pem_name.pem
+the_folder_containing_your_pem_file> ssh -i "your_pem_name.pem" ubuntu@your_instance_address_here
+(THEN UBUNTU WILL APPEAR)
+------------------------------------------------------------------------
+CONFIGURE SERVER
+------------------------------------------------------------------------
+ubuntu@54.162.31.253:~$ sudo apt-get update
+ubuntu@54.162.31.253:~$ sudo apt-get install nginx
+ubuntu@54.162.31.253:~$ git clone https://github.com/your_username_here/your_repo_name_here
+ubuntu@54.162.31.253:~$ sudo apt-get install python3-venv //Say YES when prompted
+ubuntu@54.162.31.253:~$ cd {{ repo name }}
+ubuntu@54.162.31.253:~/myRepoName$ python3 -m venv venv //We are using the venv command and naming our virtual env venv
+ubuntu@54.162.31.253:~/myRepoName$ source venv/bin/activate
+
+(venv) ubuntu@54.162.31.253:~/myRepoName$ pip install django==2.2
+(venv) ubuntu@54.162.31.253:~/myRepoName$ pip install bcrypt
+(venv) ubuntu@54.162.31.253:~/myRepoName$ pip install gunicorn
+---------------------------------------------------------------------
+VIMM COMMANDS   :WQ = QUIT/W/SAVE   I = INSERT  ESC = EXIT  Q= EXIT
+---------------------------------------------------------------------
+GO TO MAIN PROJECT DIRECTORY AND EDIT SETTINGS
+
+(venv) ubuntu@54.162.31.253:~/myRepoName$ cd {{projectName}}
+(venv) ubuntu@54.162.31.253:~/myRepoName/projectName$ sudo vim settings.py
+------------------------------------------------------------------------------
+# inside settings.py
+# modify these lines
+DEBUG = False
+ALLOWED_HOSTS = ['{{yourEC2.public.ip}}']	# keep the quotes!
+STATIC_ROOT = os.path.join(BASE_DIR, "static/")	# add this line at the bottom; don't replace any existing lines!
+--------------------------------------------------------------------------------
+(venv) ubuntu@54.162.31.253:~/myRepoName/projectName$ cd ..
+(venv) ubuntu@54.162.31.253:~myRepoName$ python manage.py collectstatic	# type yes when prompted
+(venv) ubuntu@54.162.31.253:~myRepoName$ python manage.py makemigrations
+(venv) ubuntu@54.162.31.253:~myRepoName$ python manage.py migrate
+(venv) ubuntu@54.162.31.253:~myRepoName$ gunicorn {{project_name}}.wsgi
+NO ERRORS YOU WILL SEE:
+[2016-12-27 05:45:56 +0000] [8695] [INFO] Starting gunicorn 19.6.0
+[2016-12-27 05:45:56 +0000] [8695] [INFO] Listening at: http://0.0.0.0:8000 (8695)
+[2016-12-27 05:45:56 +0000] [8695] [INFO] Using worker: sync
+[2016-12-27 05:45:56 +0000] [8700] [INFO] Booting worker with pid: 8700
+------------------------------------------------------------------------
+THEN EXIT CTRL-C AND DEACTIVATE VENV
+---------------------------------------------------------------------------
+ubuntu@54.162.31.253:~myRepoName$ sudo vim /etc/systemd/system/gunicorn.service
+---------------------------------------------------------------------------
+EDIT INFORMATION BELOW
+---------------------------------------------------------------------------
+[Unit]
+Description=gunicorn daemon
+After=network.target
+[Service]
+User=ubuntu
+Group=www-data
+WorkingDirectory=/home/ubuntu/{{myRepoName}}
+ExecStart=/home/ubuntu/{{myRepoName}}/venv/bin/gunicorn --workers 3 --bind unix:/home/ubuntu/{{myRepoName}}/{{projectName}}.sock {{projectName}}.wsgi:application
+[Install]
+WantedBy=multi-user.target
+-----------------------------------------------------------------------------
+ubuntu@54.162.31.253:~$ sudo systemctl daemon-reload
+ubuntu@54.162.31.253:~$ sudo systemctl restart gunicorn
+ubuntu@54.162.31.253:~$ sudo systemctl status gunicorn
+---------------------------------------------------------------------------
+ubuntu@54.162.31.253:~$ sudo vim /etc/nginx/sites-available/{{projectName}}
+EDIT INFORMATION BELOW
+------------------------------------------------------------------------------
+server {
+  listen 80;
+  server_name {{yourEC2.public.ip}};
+  location = /favicon.ico { access_log off; log_not_found off; }
+  location /static/ {
+      root /home/ubuntu/{{myRepoName}};
+  }
+  location / {
+      include proxy_params;
+      proxy_pass http://unix:/home/ubuntu/{{myRepoName}}/{{projectName}}.sock;
+  }
+}
+----------------------------------------------------------------------------
+ubuntu@54.162.31.253:~$ sudo ln -s /etc/nginx/sites-available/{{projectName}} /etc/nginx/sites-enabled
+ubuntu@54.162.31.253:~$ sudo nginx -t
+ubuntu@54.162.31.253:~$ sudo rm /etc/nginx/sites-enabled/default
+ubuntu@54.162.31.253:~$ sudo service nginx restart
+LOAD IP!
+---------------------------------------------------------------------------
+
+IF YOU ARE RECONNECTING
+1. CHANGE NEW IP INFORMATION
+2. RESTART NGIX AND GUNICORN
+3. CHECK SECURITIES.
