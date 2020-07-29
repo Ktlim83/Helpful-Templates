@@ -49,3 +49,15 @@ SAMPLE FOR LOOP
 <td>{{user.email_address}}</td>
 <td>{{user.created_at}}</td>
     {% endfor %}
+    
+--------------------------------------------------------------------------------------
+
+ADD STATIC FOLDER TO ROOT AND THIS CODE POINTS TO IT.  LOOKS IN BASE/ROOT DIR FOR 'STATIC' FOLDER
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static')
+]
+
+USING JINJA TO POINT TO FILE. CAN BE USED FOR IMAGES AND URLS AS WELL
+
+href="{% static 'css/main.css' %}"
